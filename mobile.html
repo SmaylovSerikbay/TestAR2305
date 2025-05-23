@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>Mobile Web AR - Дополненная реальность</title>
+    
+    <!-- Мета-теги для мобильных устройств -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- Права доступа для камеры -->
+    <meta http-equiv="Permissions-Policy" content="camera=*, microphone=*">
+    <meta http-equiv="Feature-Policy" content="camera *; microphone *">
+    
+    <!-- CDN библиотеки с fallback -->
+    <script>
+        // Система отладки
+        window.debugAR = true;
+        window.arErrors = [];
+        
+        // Перехватываем все ошибки
+        window.addEventListener('error', function(e) {
+            const error = {
+                message: e.message,
+                filename: e.filename,
+                lineno: e.lineno,
+                colno: e.colno,
+                stack: e.error ? e.error.stack : 'No stack'
+            };
+            window.arErrors.push(error);
+            console.error('AR Error:', error);
+            showDebugInfo('Ошибка: ' + e.message);
+        });
+        
+        function showDebugInfo(message) {
+            const debugDiv = document.getElementById('debugInfo');
+            if (debugDiv) {
+                debugDiv.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+                debugDiv.scrollTop = debugDiv.scrollHeight;
+            }
+        }
+        
+        // Проверка загрузки скриптов
+        function loadScript(src, callback) {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = function() {
+                showDebugInfo('✅ Загружен: ' + src);
+                if (callback) callback();
+            };
+            script.onerror = function() {
+                showDebugInfo('❌ Ошибка загрузки: ' + src);
+                if (callback) callback(new Error('Не удалось загрузить ' + src));
+            };
+            document.head.appendChild(script);
+        }
+    </script>
+    
+    <!-- Подключаем библиотеки с обработкой ошибок -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js" 
+            onerror="showDebugInfo('❌ A-Frame не загружен')"
+            onload="showDebugInfo('✅ A-Frame загружен')"></script>
+    
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.min.js"
+            onerror="showDebugInfo('❌ AR.js не загружен')"
+            onload="showDebugInfo('✅ AR.js загружен')"></script>
+    
+    <!-- Подключаем наши стили -->
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        /* Специальные стили для мобильных */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-text-size-adjust: none;
+        }
+        
+        /* Отладочная информация */
+        #debugInfo {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            max-height: 150px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-y: auto;
+            z-index: 1001;
+            border: 1px solid #333;
+        }
+        
+        #debugToggle {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            z-index: 1002;
+        }
+        
+        .mobile-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            z-index: 999;
+        }
+        
+        .mobile-btn {
+            background: linear-gradient(145deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            touch-action: manipulation;
+            flex: 1;
+            min-width: 100px;
+            max-width: 150px;
+        }
+        
+        .mobile-btn:active {
+            background: linear-gradient(145deg, #0056b3, #004085);
+            transform: scale(0.98);
+        }
+        
+        .mobile-btn:disabled {
+            background: #6c757d;
+            opacity: 0.6;
+        }
+        
+        .mobile-status {
+            position: fixed;
+            top: 170px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 1000;
+            font-size: 14px;
+        }
+        
+        /* Скрываем отладку по умолчанию */
+        .debug-hidden {
+            display: none;
+        }
+        
+        /* Стили для AR сцены на мобильных */
+        a-scene {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        
+        /* Курсор для мобильных */
+        .mobile-cursor {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 998;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <!-- Кнопка переключения отладки -->
+    <button id="debugToggle" onclick="toggleDebug()">🐛</button>
+    
+    <!-- Отладочная информация -->
+    <div id="debugInfo" class="debug-hidden">
+        <div>🚀 Инициализация Mobile AR...</div>
+    </div>
+    
+    <!-- Статус приложения -->
+    <div class="mobile-status" id="mobileStatus">
+        📱 Загрузка AR приложения...
+    </div>
+    
+    <!-- Мобильный курсор -->
+    <div class="mobile-cursor" id="mobileCursor"></div>
+    
+    <!-- Управление для мобильных -->
+    <div class="mobile-controls">
+        <button class="mobile-btn" id="mAddCube" disabled>🟥 Куб</button>
+        <button class="mobile-btn" id="mAddSphere" disabled>🔵 Сфера</button>
+        <button class="mobile-btn" id="mAddCylinder" disabled>🟦 Цилиндр</button>
+        <button class="mobile-btn" id="mClear">🗑️ Очистить</button>
+    </div>
+
+    <!-- AR сцена оптимизированная для мобильных -->
+    <a-scene 
+        id="arScene"
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best;"
+        renderer="logarithmicDepthBuffer: true; colorManagement: true; sortObjects: true; antialias: false; precision: mediump;"
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: false"
+        loading-screen="enabled: false"
+        inspector="url: false;">
+        
+        <!-- Ассеты -->
+        <a-assets>
+            <!-- Простые материалы для мобильных -->
+            <a-mixin id="mobile-cube-material" 
+                     material="color: #ff6b6b; shader: flat;">
+            </a-mixin>
+            
+            <a-mixin id="mobile-sphere-material" 
+                     material="color: #4ecdc4; shader: flat;">
+            </a-mixin>
+            
+            <a-mixin id="mobile-cylinder-material" 
+                     material="color: #45b7d1; shader: flat;">
+            </a-mixin>
+        </a-assets>
+        
+        <!-- Простое освещение для мобильных -->
+        <a-light type="ambient" color="#ffffff" intensity="0.8"></a-light>
+        
+        <!-- AR камера оптимизированная для мобильных -->
+        <a-camera 
+            gps-camera 
+            rotation-reader 
+            id="mobileCamera"
+            look-controls-enabled="false"
+            wasd-controls-enabled="false"
+            position="0 1.6 0">
+        </a-camera>
+        
+        <!-- Контейнер для объектов -->
+        <a-entity id="mobileContainer"></a-entity>
+    </a-scene>
+
+    <!-- Мобильная версия AR скрипта -->
+    <script>
+        // Мобильная версия AR приложения
+        class MobileARApp {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.container = null;
+                this.objectCounter = 0;
+                this.isInitialized = false;
+                this.placementMode = 'cube';
+                this.objects = [];
+                this.lastTouch = null;
+                
+                // Элементы интерфейса
+                this.statusElement = document.getElementById('mobileStatus');
+                this.cubeBtn = document.getElementById('mAddCube');
+                this.sphereBtn = document.getElementById('mAddSphere');
+                this.cylinderBtn = document.getElementById('mAddCylinder');
+                this.clearBtn = document.getElementById('mClear');
+                
+                // Запускаем инициализацию
+                this.init();
+            }
+            
+            async init() {
+                try {
+                    showDebugInfo('🔄 Ожидание загрузки A-Frame...');
+                    await this.waitForAFrame();
+                    
+                    showDebugInfo('🔄 Получение элементов сцены...');
+                    this.scene = document.querySelector('#arScene');
+                    this.camera = document.querySelector('#mobileCamera');
+                    this.container = document.querySelector('#mobileContainer');
+                    
+                    showDebugInfo('🔄 Настройка обработчиков событий...');
+                    this.setupEventListeners();
+                    
+                    showDebugInfo('🔄 Ожидание готовности AR...');
+                    await this.waitForARReady();
+                    
+                    this.updateStatus('✅ AR готов! Выберите объект и коснитесь экрана');
+                    this.enableControls();
+                    this.isInitialized = true;
+                    
+                    showDebugInfo('✅ Инициализация завершена');
+                    
+                } catch (error) {
+                    showDebugInfo('❌ Ошибка инициализации: ' + error.message);
+                    this.updateStatus('❌ Ошибка: ' + error.message);
+                }
+            }
+            
+            waitForAFrame() {
+                return new Promise((resolve, reject) => {
+                    const checkAFrame = () => {
+                        if (window.AFRAME) {
+                            showDebugInfo('✅ A-Frame доступен');
+                            resolve();
+                        } else if (document.readyState === 'complete') {
+                            setTimeout(checkAFrame, 100);
+                        } else {
+                            window.addEventListener('load', checkAFrame);
+                        }
+                    };
+                    checkAFrame();
+                    
+                    // Таймаут для предотвращения бесконечного ожидания
+                    setTimeout(() => {
+                        if (!window.AFRAME) {
+                            reject(new Error('A-Frame не загружен'));
+                        }
+                    }, 10000);
+                });
+            }
+            
+            waitForARReady() {
+                return new Promise((resolve) => {
+                    if (this.scene.hasLoaded) {
+                        resolve();
+                    } else {
+                        this.scene.addEventListener('loaded', resolve);
+                        // Резервный таймер
+                        setTimeout(resolve, 5000);
+                    }
+                });
+            }
+            
+            setupEventListeners() {
+                // Кнопки управления
+                this.cubeBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.setPlacementMode('cube');
+                });
+                
+                this.sphereBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.setPlacementMode('sphere');
+                });
+                
+                this.cylinderBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.setPlacementMode('cylinder');
+                });
+                
+                this.clearBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.clearAllObjects();
+                });
+                
+                // Сенсорные события для размещения
+                this.scene.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.handlePlacement(e);
+                });
+                
+                // Предотвращаем зум и прокрутку
+                document.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                }, { passive: false });
+                
+                document.addEventListener('gesturestart', (e) => {
+                    e.preventDefault();
+                });
+            }
+            
+            setPlacementMode(mode) {
+                this.placementMode = mode;
+                
+                // Обновляем активную кнопку
+                [this.cubeBtn, this.sphereBtn, this.cylinderBtn].forEach(btn => {
+                    btn.style.background = 'linear-gradient(145deg, #007bff, #0056b3)';
+                });
+                
+                if (mode === 'cube') this.cubeBtn.style.background = 'linear-gradient(145deg, #28a745, #1e7e34)';
+                if (mode === 'sphere') this.sphereBtn.style.background = 'linear-gradient(145deg, #28a745, #1e7e34)';
+                if (mode === 'cylinder') this.cylinderBtn.style.background = 'linear-gradient(145deg, #28a745, #1e7e34)';
+                
+                this.updateStatus(`📍 Режим: ${this.getModeText(mode)}. Коснитесь экрана для размещения`);
+                showDebugInfo('🎯 Режим размещения: ' + mode);
+            }
+            
+            getModeText(mode) {
+                const modes = {
+                    'cube': 'Размещение куба',
+                    'sphere': 'Размещение сферы',
+                    'cylinder': 'Размещение цилиндра'
+                };
+                return modes[mode] || mode;
+            }
+            
+            handlePlacement(event) {
+                if (!this.isInitialized || !this.placementMode) return;
+                
+                showDebugInfo('👆 Касание обнаружено');
+                
+                const position = this.calculatePlacementPosition();
+                if (position) {
+                    this.placeObject(this.placementMode, position);
+                } else {
+                    showDebugInfo('❌ Не удалось вычислить позицию');
+                }
+            }
+            
+            calculatePlacementPosition() {
+                try {
+                    const cameraEl = this.camera;
+                    const cameraPosition = cameraEl.getAttribute('position');
+                    const cameraRotation = cameraEl.getAttribute('rotation');
+                    
+                    const distance = 1.5; // Метров перед камерой
+                    const radY = (cameraRotation.y * Math.PI) / 180;
+                    
+                    const x = cameraPosition.x + Math.sin(radY) * distance;
+                    const z = cameraPosition.z - Math.cos(radY) * distance;
+                    const y = cameraPosition.y - 0.3;
+                    
+                    showDebugInfo(`📍 Позиция: x=${x.toFixed(2)}, y=${y.toFixed(2)}, z=${z.toFixed(2)}`);
+                    return { x, y, z };
+                } catch (error) {
+                    showDebugInfo('❌ Ошибка вычисления позиции: ' + error.message);
+                    return null;
+                }
+            }
+            
+            placeObject(type, position) {
+                try {
+                    const objectId = `mobile_${type}_${this.objectCounter++}`;
+                    
+                    const objectEl = document.createElement('a-entity');
+                    objectEl.setAttribute('id', objectId);
+                    objectEl.classList.add('mobile-ar-object');
+                    
+                    this.setupMobileObjectGeometry(objectEl, type);
+                    objectEl.setAttribute('position', `${position.x} ${position.y} ${position.z}`);
+                    
+                    // Простая анимация появления
+                    objectEl.setAttribute('animation', {
+                        property: 'scale',
+                        from: '0 0 0',
+                        to: '0.3 0.3 0.3',
+                        dur: 300
+                    });
+                    
+                    this.container.appendChild(objectEl);
+                    
+                    this.objects.push({
+                        id: objectId,
+                        type: type,
+                        element: objectEl,
+                        position: position,
+                        timestamp: Date.now()
+                    });
+                    
+                    this.updateStatus(`✅ ${this.getModeText(type)} размещен! Объектов: ${this.objects.length}`);
+                    showDebugInfo('✅ Объект размещен: ' + type);
+                    
+                } catch (error) {
+                    showDebugInfo('❌ Ошибка размещения: ' + error.message);
+                    this.updateStatus('❌ Ошибка размещения объекта');
+                }
+            }
+            
+            setupMobileObjectGeometry(element, type) {
+                const scale = 0.3;
+                
+                switch (type) {
+                    case 'cube':
+                        element.setAttribute('geometry', {
+                            primitive: 'box',
+                            width: scale,
+                            height: scale,
+                            depth: scale
+                        });
+                        element.setAttribute('mixin', 'mobile-cube-material');
+                        break;
+                        
+                    case 'sphere':
+                        element.setAttribute('geometry', {
+                            primitive: 'sphere',
+                            radius: scale * 0.5
+                        });
+                        element.setAttribute('mixin', 'mobile-sphere-material');
+                        break;
+                        
+                    case 'cylinder':
+                        element.setAttribute('geometry', {
+                            primitive: 'cylinder',
+                            radius: scale * 0.4,
+                            height: scale
+                        });
+                        element.setAttribute('mixin', 'mobile-cylinder-material');
+                        break;
+                }
+            }
+            
+            clearAllObjects() {
+                try {
+                    this.objects.forEach(obj => {
+                        if (obj.element && obj.element.parentNode) {
+                            obj.element.parentNode.removeChild(obj.element);
+                        }
+                    });
+                    
+                    this.objects = [];
+                    this.updateStatus('🗑️ Все объекты удалены');
+                    showDebugInfo('🗑️ Объекты очищены');
+                    
+                } catch (error) {
+                    showDebugInfo('❌ Ошибка очистки: ' + error.message);
+                }
+            }
+            
+            updateStatus(message) {
+                if (this.statusElement) {
+                    this.statusElement.textContent = message;
+                }
+            }
+            
+            enableControls() {
+                this.cubeBtn.disabled = false;
+                this.sphereBtn.disabled = false;
+                this.cylinderBtn.disabled = false;
+                this.setPlacementMode('cube');
+            }
+        }
+        
+        // Функции отладки
+        function toggleDebug() {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.classList.toggle('debug-hidden');
+        }
+        
+        // Инициализация когда все готово
+        document.addEventListener('DOMContentLoaded', () => {
+            showDebugInfo('📱 DOM готов, запуск Mobile AR...');
+            window.mobileAR = new MobileARApp();
+        });
+        
+        // Показать все ошибки для отладки
+        function showErrors() {
+            console.log('AR Errors:', window.arErrors);
+            alert('Ошибки: ' + JSON.stringify(window.arErrors, null, 2));
+        }
+    </script>
+</body>
+</html> 

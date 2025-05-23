@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>Simple AR Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #video {
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+        }
+        
+        .overlay {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+        }
+        
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        
+        .btn {
+            flex: 1;
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .btn:active {
+            background: #0056b3;
+        }
+        
+        .object {
+            position: fixed;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            z-index: 50;
+            animation: pulse 2s infinite;
+        }
+        
+        .cube { background: #ff6b6b; border-radius: 0; }
+        .sphere { background: #4ecdc4; }
+        .cylinder { background: #45b7d1; border-radius: 25px 25px 50px 50px; }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        #debug {
+            position: fixed;
+            bottom: 100px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 100px;
+            overflow-y: auto;
+            z-index: 99;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" autoplay muted playsinline></video>
+    
+    <div class="overlay">
+        <div><strong>Простой AR тест</strong></div>
+        <div id="status">Запуск камеры...</div>
+    </div>
+    
+    <div id="debug"></div>
+    
+    <div class="controls">
+        <button class="btn" onclick="addObject('cube')">🟥 Куб</button>
+        <button class="btn" onclick="addObject('sphere')">🔵 Сфера</button>
+        <button class="btn" onclick="addObject('cylinder')">🟦 Цилиндр</button>
+        <button class="btn" onclick="clearObjects()">🗑️ Очистить</button>
+    </div>
+
+    <script>
+        let objectCounter = 0;
+        const objects = [];
+        
+        function log(message) {
+            const debug = document.getElementById('debug');
+            const time = new Date().toLocaleTimeString();
+            debug.innerHTML += `<div>${time}: ${message}</div>`;
+            debug.scrollTop = debug.scrollHeight;
+            console.log(message);
+        }
+        
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+            log('Status: ' + message);
+        }
+        
+        async function startCamera() {
+            try {
+                log('🔄 Запрос доступа к камере...');
+                
+                const constraints = {
+                    video: {
+                        facingMode: 'environment', // Задняя камера
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+                
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    log('✅ Камера запущена');
+                    updateStatus('✅ Камера работает! Нажимайте кнопки для добавления объектов');
+                };
+                
+            } catch (error) {
+                log('❌ Ошибка камеры: ' + error.message);
+                updateStatus('❌ Ошибка доступа к камере: ' + error.message);
+                
+                // Попробуем любую доступную камеру
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    const video = document.getElementById('video');
+                    video.srcObject = stream;
+                    log('✅ Фронтальная камера запущена');
+                    updateStatus('✅ Фронтальная камера работает!');
+                } catch (fallbackError) {
+                    log('❌ Критическая ошибка: ' + fallbackError.message);
+                    updateStatus('❌ Камера недоступна: ' + fallbackError.message);
+                }
+            }
+        }
+        
+        function addObject(type) {
+            try {
+                log(`🎯 Добавление объекта: ${type}`);
+                
+                const object = document.createElement('div');
+                object.className = `object ${type}`;
+                object.id = `obj_${objectCounter++}`;
+                
+                // Размещаем в случайном месте на экране
+                const x = Math.random() * (window.innerWidth - 50);
+                const y = Math.random() * (window.innerHeight - 200) + 100;
+                
+                object.style.left = x + 'px';
+                object.style.top = y + 'px';
+                
+                document.body.appendChild(object);
+                objects.push(object);
+                
+                updateStatus(`✅ ${type} добавлен! Объектов: ${objects.length}`);
+                log(`✅ Объект размещен в позиции (${x.toFixed(0)}, ${y.toFixed(0)})`);
+                
+            } catch (error) {
+                log('❌ Ошибка добавления объекта: ' + error.message);
+            }
+        }
+        
+        function clearObjects() {
+            try {
+                objects.forEach(obj => {
+                    if (obj.parentNode) {
+                        obj.parentNode.removeChild(obj);
+                    }
+                });
+                objects.length = 0;
+                updateStatus('🗑️ Все объекты удалены');
+                log('🗑️ Объекты очищены');
+            } catch (error) {
+                log('❌ Ошибка очистки: ' + error.message);
+            }
+        }
+        
+        // Информация о браузере
+        function getBrowserInfo() {
+            const info = {
+                userAgent: navigator.userAgent,
+                vendor: navigator.vendor,
+                platform: navigator.platform,
+                cookieEnabled: navigator.cookieEnabled,
+                onLine: navigator.onLine,
+                mediaDevices: !!navigator.mediaDevices,
+                getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+            };
+            
+            log('📱 Браузер: ' + navigator.userAgent.split(' ').pop());
+            log('📱 Камера поддерживается: ' + (info.getUserMedia ? 'Да' : 'Нет'));
+            
+            return info;
+        }
+        
+        // Обработка ошибок
+        window.addEventListener('error', (e) => {
+            log('❌ Глобальная ошибка: ' + e.message);
+        });
+        
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', () => {
+            log('📱 DOM загружен');
+            getBrowserInfo();
+            startCamera();
+        });
+        
+        // Предотвращение масштабирования
+        document.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        document.addEventListener('gesturestart', (e) => {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html> 
