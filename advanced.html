@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Advanced Web AR - Точное размещение объектов</title>
+    
+    <!-- A-Frame библиотека -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    
+    <!-- AR.js для веб-AR -->
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.min.js"></script>
+    
+    <!-- Дополнительные компоненты для AR -->
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+    
+    <!-- Physics system для A-Frame -->
+    <script src="https://cdn.jsdelivr.net/gh/n5ro/aframe-physics-system@v4.0.1/dist/aframe-physics-system.min.js"></script>
+    
+    <!-- Подключаем наши стили -->
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        .webxr-info {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: rgba(255, 107, 107, 0.9);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            max-width: 200px;
+            z-index: 998;
+            backdrop-filter: blur(10px);
+        }
+        
+        .calibration-helper {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 193, 7, 0.9);
+            color: black;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            z-index: 997;
+            display: none;
+        }
+        
+        .surface-detected {
+            background: rgba(40, 167, 69, 0.9) !important;
+            color: white !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Индикатор загрузки -->
+    <div id="loadingIndicator">
+        <div>Инициализация Advanced AR...</div>
+        <div>Проверяем поддержку WebXR</div>
+    </div>
+    
+    <!-- Информация о WebXR -->
+    <div class="webxr-info" id="webxrInfo" style="display: none;">
+        <div><strong>WebXR AR</strong></div>
+        <div id="webxrStatus">Проверяем поддержку...</div>
+    </div>
+    
+    <!-- UI информация -->
+    <div class="ui-overlay">
+        <div><strong>Advanced Web AR</strong></div>
+        <div id="status">Инициализация...</div>
+        <div style="margin-top: 10px; font-size: 12px;">
+            • <span id="trackingMode">Базовое отслеживание</span><br>
+            • Наведите на ровную поверхность<br>
+            • Ищите индикатор размещения<br>
+            • Объекты фиксируются точно на поверхности
+        </div>
+    </div>
+    
+    <!-- Помощник калибровки -->
+    <div class="calibration-helper" id="calibrationHelper">
+        <div>🎯 Поверхность обнаружена!</div>
+        <div>Нажмите кнопку для размещения объекта</div>
+    </div>
+    
+    <!-- Управление -->
+    <div class="controls">
+        <button class="btn" id="addCube" disabled>🟥 Куб</button>
+        <button class="btn" id="addSphere" disabled>🔵 Сфера</button>
+        <button class="btn" id="addCylinder" disabled>🟦 Цилиндр</button>
+        <button class="btn" id="clearObjects">🗑 Очистить</button>
+        <button class="btn" id="calibrateBtn" style="background: #ffc107;">📐 Калибровка</button>
+    </div>
+
+    <!-- AR сцена с физикой -->
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        renderer="logarithmicDepthBuffer: true; colorManagement: true; sortObjects: true; antialias: true;"
+        physics="driver: ammo; debug: false; debugDrawMode: 0;"
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: false"
+        background="color: transparent;">
+        
+        <!-- Ассеты -->
+        <a-assets>
+            <!-- Улучшенные материалы с PBR -->
+            <a-mixin id="cube-material" 
+                     material="color: #ff6b6b; metalness: 0.3; roughness: 0.7; envMap: #env;">
+            </a-mixin>
+            
+            <a-mixin id="sphere-material" 
+                     material="color: #4ecdc4; metalness: 0.5; roughness: 0.6; envMap: #env;">
+            </a-mixin>
+            
+            <a-mixin id="cylinder-material" 
+                     material="color: #45b7d1; metalness: 0.2; roughness: 0.8; envMap: #env;">
+            </a-mixin>
+            
+            <!-- Текстуры для реалистичности -->
+            <a-cubemap id="env" 
+                       src="https://cdn.aframe.io/examples/sky/environment/pisa-posx.jpg https://cdn.aframe.io/examples/sky/environment/pisa-negx.jpg https://cdn.aframe.io/examples/sky/environment/pisa-posy.jpg https://cdn.aframe.io/examples/sky/environment/pisa-negy.jpg https://cdn.aframe.io/examples/sky/environment/pisa-posz.jpg https://cdn.aframe.io/examples/sky/environment/pisa-negz.jpg">
+            </a-cubemap>
+            
+            <!-- Звуки -->
+            <audio id="placeSound" preload="auto">
+                <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmIlBjuJzPPIeS0GK4DN8tiKOQceXKvn5K5VDQxNpOPvq2cjEjOI0O6+ciMFKYLL8ODMeSgPZ7no3q4+DRVGl9n1vpgiAZ9yWrg=" type="audio/wav">
+            </audio>
+        </a-assets>
+        
+        <!-- Улучшенное освещение -->
+        <a-light type="ambient" color="#404040" intensity="0.6"></a-light>
+        <a-light type="directional" 
+                 color="#ffffff" 
+                 intensity="1.0" 
+                 position="0 10 5"
+                 shadow="cast: true; mapSize: 2048;">
+        </a-light>
+        <a-light type="point" 
+                 color="#4fc3f7" 
+                 intensity="0.5" 
+                 position="0 3 0">
+        </a-light>
+        
+        <!-- AR камера с улучшенным отслеживанием -->
+        <a-camera 
+            gps-camera 
+            rotation-reader 
+            id="arCamera"
+            look-controls-enabled="false"
+            arjs-look-controls="smoothingFactor: 0.1"
+            position="0 1.6 0">
+            
+            <!-- Курсор с улучшенной визуализацией -->
+            <a-cursor 
+                id="cursor"
+                animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
+                animation__fusing="property: fusing; startEvents: fusing; from: 1 1 1; to: 0.1 0.1 0.1; dur: 1500"
+                raycaster="objects: .interactive; far: 20; near: 0;"
+                geometry="primitive: ring; radiusOuter: 0.020; radiusInner: 0.012;"
+                material="color: #4fc3f7; shader: flat; opacity: 0.8; transparent: true;"
+                position="0 0 -1">
+            </a-cursor>
+        </a-camera>
+        
+        <!-- Контейнер для объектов с физикой -->
+        <a-entity id="objectContainer" 
+                  static-body="shape: none;">
+        </a-entity>
+        
+        <!-- Невидимая плоскость для симуляции пола -->
+        <a-plane 
+            id="groundPlane"
+            position="0 -1 0" 
+            rotation="-90 0 0" 
+            width="100" 
+            height="100" 
+            material="opacity: 0; transparent: true;"
+            static-body="shape: box;"
+            visible="false">
+        </a-plane>
+    </a-scene>
+
+    <!-- Сначала загружаем базовый AR -->
+    <script src="ar-app.js"></script>
+    <!-- Затем продвинутый AR -->
+    <script src="advanced-ar.js"></script>
+    
+    <script>
+        // Дополнительная настройка интерфейса
+        document.addEventListener('DOMContentLoaded', () => {
+            const webxrInfo = document.getElementById('webxrInfo');
+            const webxrStatus = document.getElementById('webxrStatus');
+            const trackingMode = document.getElementById('trackingMode');
+            const calibrationHelper = document.getElementById('calibrationHelper');
+            const calibrateBtn = document.getElementById('calibrateBtn');
+            
+            // Показываем информацию о WebXR
+            webxrInfo.style.display = 'block';
+            
+            // Обновляем статус WebXR
+            setTimeout(() => {
+                if (window.arApp && window.arApp.isWebXRSupported) {
+                    webxrStatus.textContent = 'Поддерживается ✅';
+                    trackingMode.textContent = 'WebXR отслеживание';
+                } else {
+                    webxrStatus.textContent = 'Не поддерживается ❌';
+                    trackingMode.textContent = 'AR.js отслеживание';
+                }
+            }, 2000);
+            
+            // Обработчик калибровки
+            calibrateBtn.addEventListener('click', () => {
+                if (window.arApp && window.arApp.calibrateSurfaceTracking) {
+                    window.arApp.calibrateSurfaceTracking();
+                    calibrationHelper.style.display = 'block';
+                    setTimeout(() => {
+                        calibrationHelper.style.display = 'none';
+                    }, 3000);
+                }
+            });
+            
+            // Симуляция обнаружения поверхности
+            setInterval(() => {
+                if (window.arApp && window.arApp.isInitialized) {
+                    const hasObjects = window.arApp.objects.length > 0;
+                    if (hasObjects && Math.random() > 0.7) {
+                        calibrationHelper.classList.add('surface-detected');
+                        calibrationHelper.style.display = 'block';
+                        setTimeout(() => {
+                            calibrationHelper.style.display = 'none';
+                            calibrationHelper.classList.remove('surface-detected');
+                        }, 2000);
+                    }
+                }
+            }, 5000);
+        });
+        
+        // Дополнительные утилиты для продвинутого AR
+        window.ARUtils = {
+            // Проверка качества отслеживания
+            checkTrackingQuality() {
+                if (window.arApp) {
+                    const info = window.arApp.getObjectsInfo();
+                    console.log('Качество отслеживания:', {
+                        objects: info.total,
+                        anchored: info.objects.filter(obj => obj.anchored).length,
+                        webxr: window.arApp.isWebXRSupported
+                    });
+                }
+            },
+            
+            // Экспорт позиций объектов
+            exportObjectPositions() {
+                if (window.arApp) {
+                    const positions = window.arApp.objects.map(obj => ({
+                        id: obj.id,
+                        type: obj.type,
+                        position: obj.position,
+                        timestamp: obj.timestamp
+                    }));
+                    
+                    const json = JSON.stringify(positions, null, 2);
+                    console.log('Позиции объектов:', json);
+                    
+                    // Сохранение в localStorage
+                    localStorage.setItem('ar-objects', json);
+                    
+                    return json;
+                }
+            },
+            
+            // Импорт позиций объектов
+            importObjectPositions() {
+                const saved = localStorage.getItem('ar-objects');
+                if (saved && window.arApp) {
+                    const positions = JSON.parse(saved);
+                    positions.forEach(obj => {
+                        window.arApp.placeObject(obj.type, obj.position);
+                    });
+                    console.log(`Загружено ${positions.length} объектов`);
+                }
+            }
+        };
+    </script>
+</body>
+</html> 
