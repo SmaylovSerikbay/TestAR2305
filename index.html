@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Web AR - Объекты на поверхности</title>
+    
+    <!-- A-Frame библиотека -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    
+    <!-- AR.js для веб-AR -->
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.min.js"></script>
+    
+    <!-- Дополнительные компоненты для AR -->
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+    
+    <!-- Подключаем наши стили -->
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        
+        .ui-overlay {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 999;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            max-width: 300px;
+        }
+        
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            touch-action: manipulation;
+        }
+        
+        .btn:hover {
+            background: #0056b3;
+        }
+        
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        #loadingIndicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Индикатор загрузки -->
+    <div id="loadingIndicator">
+        <div>Загрузка AR...</div>
+        <div>Разрешите доступ к камере</div>
+    </div>
+    
+    <!-- UI информация -->
+    <div class="ui-overlay">
+        <div><strong>Веб AR - Объекты на поверхности</strong></div>
+        <div id="status">Инициализация...</div>
+        <div style="margin-top: 10px; font-size: 12px;">
+            • Наведите камеру на ровную поверхность<br>
+            • Нажмите кнопки для добавления объектов<br>
+            • Объекты будут зафиксированы на поверхности
+        </div>
+    </div>
+    
+    <!-- Управление -->
+    <div class="controls">
+        <button class="btn" id="addCube" disabled>Добавить куб</button>
+        <button class="btn" id="addSphere" disabled>Добавить сферу</button>
+        <button class="btn" id="addCylinder" disabled>Добавить цилиндр</button>
+        <button class="btn" id="clearObjects">Очистить</button>
+    </div>
+
+    <!-- AR сцена -->
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        renderer="logarithmicDepthBuffer: true; colorManagement: true; sortObjects: true;"
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: false">
+        
+        <!-- Ассеты -->
+        <a-assets>
+            <!-- Материалы -->
+            <a-mixin id="cube-material" 
+                     material="color: #ff6b6b; metalness: 0.2; roughness: 0.8">
+            </a-mixin>
+            
+            <a-mixin id="sphere-material" 
+                     material="color: #4ecdc4; metalness: 0.3; roughness: 0.7">
+            </a-mixin>
+            
+            <a-mixin id="cylinder-material" 
+                     material="color: #45b7d1; metalness: 0.1; roughness: 0.9">
+            </a-mixin>
+            
+            <!-- Анимации -->
+            <a-animation id="spawn-animation"
+                        attribute="scale"
+                        from="0 0 0"
+                        to="1 1 1"
+                        dur="500"
+                        easing="easeOutElastic">
+            </a-animation>
+        </a-assets>
+        
+        <!-- Освещение -->
+        <a-light type="ambient" color="#404040" intensity="0.5"></a-light>
+        <a-light type="directional" 
+                 color="#ffffff" 
+                 intensity="0.8" 
+                 position="0 5 2">
+        </a-light>
+        
+        <!-- AR камера -->
+        <a-camera gps-camera rotation-reader id="arCamera">
+            <!-- Курсор для взаимодействия -->
+            <a-cursor 
+                id="cursor"
+                animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
+                animation__fusing="property: fusing; startEvents: fusing; from: 1 1 1; to: 0.1 0.1 0.1; dur: 1500"
+                raycaster="objects: .interactive"
+                geometry="primitive: ring; radiusOuter: 0.016; radiusInner: 0.01;"
+                material="color: white; shader: flat"
+                position="0 0 -1">
+            </a-cursor>
+        </a-camera>
+        
+        <!-- Контейнер для объектов -->
+        <a-entity id="objectContainer"></a-entity>
+    </a-scene>
+
+    <script src="ar-app.js"></script>
+</body>
+</html> 

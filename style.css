@@ -1,0 +1,271 @@
+/* Основные стили для AR приложения */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #000;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+/* Стили для активной кнопки */
+.btn.active {
+    background: #28a745 !important;
+    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+}
+
+/* Улучшенные стили для кнопок */
+.btn {
+    background: linear-gradient(145deg, #007bff, #0056b3);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    touch-action: manipulation;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.btn:hover:not(:disabled) {
+    background: linear-gradient(145deg, #0056b3, #004085);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+}
+
+.btn:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(0, 123, 255, 0.3);
+}
+
+.btn:disabled {
+    background: linear-gradient(145deg, #6c757d, #5a6268);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Улучшенная информационная панель */
+.ui-overlay {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 999;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    max-width: 350px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.ui-overlay strong {
+    color: #4fc3f7;
+    font-size: 16px;
+}
+
+#status {
+    margin: 10px 0;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    border-left: 3px solid #4fc3f7;
+    font-weight: 500;
+}
+
+/* Улучшенные контролы */
+.controls {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 90vw;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .ui-overlay {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        max-width: none;
+        font-size: 13px;
+        padding: 15px;
+    }
+    
+    .controls {
+        bottom: 20px;
+        gap: 10px;
+    }
+    
+    .btn {
+        padding: 10px 20px;
+        font-size: 14px;
+        min-width: 120px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ui-overlay {
+        font-size: 12px;
+        padding: 12px;
+    }
+    
+    .btn {
+        padding: 8px 16px;
+        font-size: 13px;
+        min-width: 100px;
+    }
+    
+    .controls {
+        bottom: 15px;
+        gap: 8px;
+    }
+}
+
+/* Индикатор загрузки */
+#loadingIndicator {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: white;
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+#loadingIndicator div:first-child {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #4fc3f7;
+}
+
+#loadingIndicator div:last-child {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+/* Анимация загрузки */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+#loadingIndicator::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 40px;
+    margin: 15px auto 0;
+    border: 3px solid rgba(79, 195, 247, 0.3);
+    border-top: 3px solid #4fc3f7;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Утилитарные классы */
+.hidden {
+    display: none !important;
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Стили для AR сцены */
+a-scene {
+    width: 100vw;
+    height: 100vh;
+}
+
+/* Предотвращаем выделение текста на мобильных */
+.no-select {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Стили для полноэкранного режима */
+.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+}
+
+/* Дополнительные визуальные эффекты */
+.glass-effect {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.neon-glow {
+    box-shadow: 
+        0 0 5px currentColor,
+        0 0 10px currentColor,
+        0 0 15px currentColor,
+        0 0 20px currentColor;
+}
+
+/* Стили для курсора AR */
+.ar-cursor {
+    pointer-events: none;
+    position: fixed;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #4fc3f7;
+    border-radius: 50%;
+    z-index: 998;
+    transition: all 0.1s ease;
+    background: rgba(79, 195, 247, 0.2);
+}
+
+.ar-cursor.active {
+    transform: scale(1.5);
+    background: rgba(79, 195, 247, 0.4);
+    box-shadow: 0 0 20px rgba(79, 195, 247, 0.6);
+} 
