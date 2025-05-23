@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Диагностика камеры</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #000;
+            color: #fff;
+        }
+        
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .pass { background: #28a745; }
+        .fail { background: #dc3545; }
+        .warn { background: #ffc107; color: #000; }
+        
+        #video {
+            width: 100%;
+            max-width: 400px;
+            border: 2px solid #fff;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        
+        button:active {
+            background: #0056b3;
+        }
+        
+        #log {
+            background: #333;
+            color: #0f0;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 20px 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Диагностика AR</h1>
+    
+    <div id="tests">
+        <div id="test-results"></div>
+    </div>
+    
+    <button onclick="runTests()">🧪 Запустить тесты</button>
+    <button onclick="testCamera()">📷 Тест камеры</button>
+    <button onclick="clearLog()">🗑️ Очистить лог</button>
+    
+    <div id="log"></div>
+    
+    <video id="video" style="display: none;" autoplay muted playsinline></video>
+    
+    <script>
+        // Лог функция
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#f00' : type === 'success' ? '#0f0' : '#fff';
+            logDiv.innerHTML += `<div style="color: ${color}">[${time}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function addTestResult(name, passed, details = '') {
+            const results = document.getElementById('test-results');
+            const className = passed ? 'pass' : 'fail';
+            const emoji = passed ? '✅' : '❌';
+            results.innerHTML += `
+                <div class="test-result ${className}">
+                    ${emoji} ${name} ${details}
+                </div>
+            `;
+        }
+        
+        function runTests() {
+            document.getElementById('test-results').innerHTML = '';
+            log('🔄 Запуск диагностических тестов...', 'info');
+            
+            // Тест 1: Базовые API
+            log('Тест 1: Проверка базовых API...', 'info');
+            const hasNavigator = typeof navigator !== 'undefined';
+            addTestResult('Navigator API', hasNavigator);
+            log(`Navigator доступен: ${hasNavigator}`, hasNavigator ? 'success' : 'error');
+            
+            // Тест 2: MediaDevices API
+            log('Тест 2: Проверка MediaDevices API...', 'info');
+            const hasMediaDevices = !!(navigator && navigator.mediaDevices);
+            addTestResult('MediaDevices API', hasMediaDevices);
+            log(`MediaDevices доступен: ${hasMediaDevices}`, hasMediaDevices ? 'success' : 'error');
+            
+            // Тест 3: getUserMedia
+            log('Тест 3: Проверка getUserMedia...', 'info');
+            const hasGetUserMedia = !!(navigator && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+            addTestResult('getUserMedia API', hasGetUserMedia);
+            log(`getUserMedia доступен: ${hasGetUserMedia}`, hasGetUserMedia ? 'success' : 'error');
+            
+            // Тест 4: HTTPS/Secure Context
+            log('Тест 4: Проверка безопасного контекста...', 'info');
+            const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
+            addTestResult('Secure Context (HTTPS)', isSecureContext);
+            log(`Безопасный контекст: ${isSecureContext}`, isSecureContext ? 'success' : 'error');
+            
+            // Тест 5: Информация о браузере
+            log('Тест 5: Информация о браузере...', 'info');
+            if (navigator) {
+                log(`User Agent: ${navigator.userAgent}`, 'info');
+                log(`Platform: ${navigator.platform}`, 'info');
+                log(`Vendor: ${navigator.vendor}`, 'info');
+                log(`Cookie enabled: ${navigator.cookieEnabled}`, 'info');
+                log(`Online: ${navigator.onLine}`, 'info');
+            }
+            
+            // Тест 6: Разрешения
+            if (navigator.permissions) {
+                log('Тест 6: Проверка разрешений камеры...', 'info');
+                navigator.permissions.query({ name: 'camera' }).then(result => {
+                    log(`Разрешение камеры: ${result.state}`, result.state === 'granted' ? 'success' : 'error');
+                    addTestResult('Camera Permission', result.state === 'granted', `(${result.state})`);
+                }).catch(err => {
+                    log(`Ошибка проверки разрешений: ${err.message}`, 'error');
+                });
+            } else {
+                log('Permissions API недоступен', 'warn');
+            }
+            
+            // Тест 7: Enumerate devices
+            if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+                log('Тест 7: Поиск камер...', 'info');
+                navigator.mediaDevices.enumerateDevices().then(devices => {
+                    const cameras = devices.filter(device => device.kind === 'videoinput');
+                    log(`Найдено камер: ${cameras.length}`, cameras.length > 0 ? 'success' : 'error');
+                    cameras.forEach((camera, index) => {
+                        log(`Камера ${index + 1}: ${camera.label || 'Без названия'}`, 'info');
+                    });
+                    addTestResult('Cameras Found', cameras.length > 0, `(${cameras.length} камер)`);
+                }).catch(err => {
+                    log(`Ошибка поиска устройств: ${err.message}`, 'error');
+                });
+            }
+            
+            log('✅ Диагностика завершена', 'success');
+        }
+        
+        async function testCamera() {
+            log('📷 Запуск теста камеры...', 'info');
+            const video = document.getElementById('video');
+            
+            try {
+                // Тест с минимальными настройками
+                log('Попытка 1: Минимальные настройки...', 'info');
+                let stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                log('✅ Камера запущена с минимальными настройками!', 'success');
+                addTestResult('Basic Camera Access', true, '(любая камера)');
+                
+                // Остановим поток для следующего теста
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Тест с задней камерой
+                log('Попытка 2: Задняя камера...', 'info');
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                video.srcObject = stream;
+                log('✅ Задняя камера работает!', 'success');
+                addTestResult('Back Camera Access', true, '(environment)');
+                
+            } catch (error) {
+                log(`❌ Ошибка доступа к камере: ${error.name} - ${error.message}`, 'error');
+                addTestResult('Camera Access', false, `(${error.name})`);
+                
+                // Диагностика конкретных ошибок
+                if (error.name === 'NotAllowedError') {
+                    log('🚫 Доступ к камере запрещен пользователем', 'error');
+                    log('💡 Решение: Разрешите доступ к камере в настройках браузера', 'warn');
+                } else if (error.name === 'NotFoundError') {
+                    log('📷 Камера не найдена', 'error');
+                    log('💡 Решение: Проверьте подключение камеры', 'warn');
+                } else if (error.name === 'NotSupportedError') {
+                    log('🚫 Браузер не поддерживает доступ к камере', 'error');
+                    log('💡 Решение: Обновите браузер или используйте Chrome/Safari', 'warn');
+                } else if (error.name === 'NotReadableError') {
+                    log('🔒 Камера используется другим приложением', 'error');
+                    log('💡 Решение: Закройте другие приложения, использующие камеру', 'warn');
+                } else if (error.name === 'SecurityError') {
+                    log('🔒 Ошибка безопасности', 'error');
+                    log('💡 Решение: Используйте HTTPS или localhost', 'warn');
+                }
+                
+                // Попробуем фронтальную камеру
+                try {
+                    log('Попытка 3: Фронтальная камера...', 'info');
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user' }
+                    });
+                    video.srcObject = stream;
+                    video.style.display = 'block';
+                    log('✅ Фронтальная камера работает!', 'success');
+                    addTestResult('Front Camera Access', true, '(user)');
+                } catch (frontError) {
+                    log(`❌ Фронтальная камера тоже не работает: ${frontError.message}`, 'error');
+                }
+            }
+        }
+        
+        // Обработка ошибок
+        window.addEventListener('error', (e) => {
+            log(`❌ JavaScript ошибка: ${e.message} в ${e.filename}:${e.lineno}`, 'error');
+        });
+        
+        // Автозапуск тестов
+        window.addEventListener('load', () => {
+            log('🚀 Страница загружена, запуск автодиагностики...', 'info');
+            setTimeout(runTests, 500);
+        });
+    </script>
+</body>
+</html> 
